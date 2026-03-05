@@ -58,6 +58,27 @@ declare -A ALERT_SENT
 declare -a APP_LIST
 declare -A WEBHOOK_SET
 
+terminal_cols() {
+  local cols=80
+  if command -v tput >/dev/null 2>&1; then
+    cols="$(tput cols 2>/dev/null || echo 80)"
+  fi
+  [[ "$cols" =~ ^[0-9]+$ ]] || cols=80
+  (( cols < 40 )) && cols=40
+  echo "$cols"
+}
+
+ellipsize() {
+  local s="$1" max="$2"
+  if (( ${#s} <= max )); then
+    echo "$s"
+  elif (( max <= 3 )); then
+    printf "%.${max}s" "$s"
+  else
+    printf "%s..." "${s:0:$((max-3))}"
+  fi
+}
+
 ts_utc() {
   date -u +"%Y-%m-%dT%H:%M:%SZ"
 }
@@ -906,7 +927,7 @@ menu_tail_log() {
 }
 
 render_dashboard() {
-  local cpu_now ram_now net down up down_mbps up_mbps iface daemon_state guard_state
+  local cpu_now ram_now net down up down_mbps up_mbps iface daemon_state guard_state cols iface_show
   cpu_now="$(cpu_percent)"
   ram_now="$(ram_percent)"
   net="$(net_speed_kbs)"
@@ -932,23 +953,34 @@ render_dashboard() {
   parse_apps
   load_webhooks
 
-  clear
+  cols="$(terminal_cols)"
+  iface_show="$(ellipsize "$iface" 18)"
+
+  printf '\033[H\033[2J'
   printf "%b%s%b\n" "$C_BOLD$C_CYAN" "BG Boost Control Center" "$C_RESET"
   echo "Time UTC: $(ts_utc)"
   echo "Daemon: $daemon_state"
   echo "Safeguard: $guard_state"
   printf "CPU: %s%% [%s]  ceiling=%s%%\n" "$cpu_now" "$(status_label "$cpu_now" "$STATUS_WARN_CPU" "$CPU_CEILING_PERCENT")" "$CPU_CEILING_PERCENT"
   printf "RAM: %s%% [%s]  ceiling=%s%%\n" "$ram_now" "$(status_label "$ram_now" "$STATUS_WARN_RAM" "$RAM_CEILING_PERCENT")" "$RAM_CEILING_PERCENT"
-  printf "Net: ↓ %s Mbps ↑ %s Mbps iface=%s\n" "$down_mbps" "$up_mbps" "$iface"
+  printf "Net: down %s Mbps up %s Mbps iface=%s\n" "$down_mbps" "$up_mbps" "$iface_show"
   printf "Targets: %s | Webhooks: %s\n" "${#APP_LIST[@]}" "$(webhook_count)"
 
   echo
   echo "Shortcuts:"
-  echo "  s=start  x=stop  o=once  a=scan+add  m=manual add  r=remove app"
-  echo "  w=add webhook  d=delete webhook  l=list webhooks  t=test webhook"
-  echo "  g=settings  p=show apps  n=tail log  q=quit"
+  if (( cols < 90 )); then
+    echo "  s=start  x=stop  o=once  a=scan+add"
+    echo "  m=manual add  r=remove app  p=show apps"
+    echo "  w=add webhook  d=delete webhook  l=list"
+    echo "  t=test webhook  g=settings  n=tail log"
+    echo "  q=quit"
+  else
+    echo "  s=start  x=stop  o=once  a=scan+add  m=manual add  r=remove app"
+    echo "  w=add webhook  d=delete webhook  l=list webhooks  t=test webhook"
+    echo "  g=settings  p=show apps  n=tail log  q=quit"
+  fi
   echo
-  printf "Input (auto-refresh %ss): " "$DASHBOARD_REFRESH_SEC"
+  printf "Input 1 key (refresh %ss): " "$DASHBOARD_REFRESH_SEC"
 }
 
 menu_loop() {
@@ -957,7 +989,7 @@ menu_loop() {
   while true; do
     render_dashboard
     local key
-    read -r -t "$DASHBOARD_REFRESH_SEC" key || continue
+    read -r -s -n 1 -t "$DASHBOARD_REFRESH_SEC" key || continue
 
     case "$key" in
       s) start_daemon; pause_enter ;;
