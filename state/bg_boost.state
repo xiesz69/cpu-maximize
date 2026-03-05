@@ -1,0 +1,10 @@
+timestamp_utc=2026-03-05T11:16:17Z
+safeguard_mode=0
+cpu_percent=0
+ram_percent=70
+app.com.example.game.last_pids=
+app.com.example.game.last_seen_ts=0
+app.com.example.game.alert_sent=0
+app.com.example.app.last_pids=
+app.com.example.app.last_seen_ts=0
+app.com.example.app.alert_sent=0
