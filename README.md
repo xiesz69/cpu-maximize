@@ -1,105 +1,107 @@
-# Background App Booster for Termux (Android 12-15)
+# CPU Maximize (Auto Background Optimizer)
 
-Root-first Bash daemon for prioritizing selected apps/games, moderating non-target apps, enforcing CPU/RAM safety ceilings, and sending Discord alerts when monitored apps disappear unexpectedly.
+`bg_boost.sh` is now a fully automatic, non-interactive optimizer for Termux (Android).
+
+It runs without menu, without webhooks, and without manual package input. The script automatically scans currently running background apps and applies optimization continuously.
+
+## What It Does
+- Automatically scans running app processes
+- Detects current foreground app and avoids tuning it
+- Optimizes background apps with `renice` and `oom_score_adj`
+- Applies safety mode when CPU/RAM usage is high
+- Writes runtime state to `state/bg_boost.state`
+- Writes activity logs to `logs/bg_boost.log`
 
 ## Requirements
-- Android 12-15
-- Termux
+- Android (Termux environment)
 - Root access (`su`)
-- Tools: `pidof`, `ps`, `awk`, `sed`, `renice`, `curl`
+- Commands: `su`, `ps`, `pidof`, `awk`, `sed`, `renice`
 
 ## Project Files
-- `bg_boost.sh`: main script + interactive menu
-- `install.sh`: quick install/setup helper
-- `config/priority_apps.conf`: target app list
-- `config/bg_boost.env`: runtime settings
-- `config/discord_webhooks.conf`: multi webhook list
+- `bg_boost.sh`: main automatic optimizer
+- `install.sh`: setup helper
+- `config/bg_boost.env`: optional runtime config overrides
 - `logs/bg_boost.log`: runtime logs
-- `state/bg_boost.state`: last cycle state
+- `state/bg_boost.state`: latest cycle state
 
 ## Installation
 ```bash
 pkg update -y
-pkg install -y curl git python
+pkg install -y git python
 ```
 
-Clone and enter project:
+Clone project:
 ```bash
 git clone https://github.com/xiesz69/cpu-maximize.git
 cd cpu-maximize
+chmod +x bg_boost.sh install.sh
 ```
 
-Run installer:
+Optional setup helper:
 ```bash
-chmod +x install.sh bg_boost.sh
 ./install.sh
 ```
 
-## Configuration
-Edit target apps:
-```bash
-nano config/priority_apps.conf
-```
-
-Optional Discord webhooks:
-```bash
-nano config/discord_webhooks.conf
-```
-
 ## Usage
-Interactive menu (recommended):
+Run directly (default command = `run`):
 ```bash
-./bg_boost.sh menu
+./bg_boost.sh
 ```
 
-Direct commands:
+Run as background daemon:
 ```bash
 ./bg_boost.sh start
+```
+
+Stop daemon:
+```bash
 ./bg_boost.sh stop
+```
+
+Check status and last cycle:
+```bash
 ./bg_boost.sh status
+```
+
+Run one optimization cycle only:
+```bash
 ./bg_boost.sh once
-./bg_boost.sh webhooks
 ```
 
-## Interactive Menu Features
-- Live auto-refresh dashboard
-- Color health status: green (healthy), yellow (warning), red (critical)
-- Live internet speed (download/upload Mbps)
-- Scan running app packages and add to target list
-- Manual add/remove target apps
-- Add/remove/list Discord webhooks
-- Send test webhook
-- Quick ceiling settings (CPU/RAM)
-- Start/stop daemon and run one-cycle tune
-- Tail recent logs
+## Optional Configuration
+Edit `config/bg_boost.env` to override defaults.
 
-## App Config Format
-`config/priority_apps.conf`:
-```conf
-# package_name|mode|cpu_weight|oom_adj
-com.your.game|boost|90|-800
-com.your.app|boost|85|-700
+Supported variables:
+```bash
+SCAN_INTERVAL_SEC=2
+TARGET_NICE=-10
+TARGET_OOM_ADJ=-700
+SAFE_CPU_PERCENT=90
+SAFE_RAM_PERCENT=92
+SAFE_TARGET_NICE=-2
+SAFE_TARGET_OOM_ADJ=0
+MAX_APPS_PER_CYCLE=40
+IGNORE_PREFIXES="android,com.android"
 ```
 
-## Webhook Config
-`config/discord_webhooks.conf`:
-```conf
-https://discord.com/api/webhooks/....
-https://discord.com/api/webhooks/....
-```
+Notes:
+- `IGNORE_PREFIXES` is comma-separated.
+- Packages matching these prefixes are skipped from optimization.
 
-`DISCORD_WEBHOOK_URL` in env is still supported (legacy single URL).
+## Behavior Details
+- Script scans package-like process names from `ps -A`.
+- Foreground app is detected via `dumpsys` and skipped.
+- If CPU or RAM exceeds safety thresholds, script uses safer tuning values.
+- No UI/menu prompts are used.
 
-## GitHub Sync Script
-If you use a local sync script (for example `/root/github_sync.py`), run it from this project directory:
+## GitHub Sync
+If you use `/root/github_sync.py`:
 ```bash
 cd cpu-maximize
 python3 /root/github_sync.py
 ```
 
-## Notes
-- Root (`su`) is required for tuning other app processes.
-- Android vendor behavior differs; some kernel controls may be ignored.
-- Script avoids touching key core system daemons.
-- Keep target list focused to reduce thermal throttling and LMKD pressure.
-- Do not hardcode tokens in source files.
+## Important Notes
+- Root permissions are required; without root, tuning will fail.
+- Android vendor kernels can limit or ignore some tuning operations.
+- Do not hardcode GitHub tokens in scripts.
